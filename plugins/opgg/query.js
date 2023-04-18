@@ -72,20 +72,18 @@ export class opgg extends plugin {
         width: 1920,
         height: 1080,
       })
-      await page.goto(opggUrl, { timeout: 30000 })
+      await page.goto(opggUrl, { timeout: 120000 })
       const body = await page.$('#content-container')
       const buff = await body.screenshot({
         type: 'jpeg',
       })
       const imageMsg = segment.image(buff)
       this.e.reply(imageMsg)
+
     } catch (err) {
       this.e.reply(`${err.toString()}: ${opggUrl}`)
       logger.error('获取opgg数据数据失败')
       logger.error(err)
-      if (browser) {
-        await browser.close().catch(err => logger.error(err))
-      }
     } finally {
       if (page) {
         await page.close().catch((err) => {
@@ -94,8 +92,6 @@ export class opgg extends plugin {
         })
       }
     }
-    page = null
-    browser = null
   }
 
   /**
