@@ -51,19 +51,23 @@ export class opgg extends plugin {
       tier,
       position
     } = this.resolveCmd(this.e.msg)
+    const opggUrl = `https://www.op.gg/champions?region=global&tier=${tier}&position=${position}`
     if (!tier || !position) {
       const errStr = `段位/位置解析失败: 段位-${tier}，位置：${position}`
       this.e.reply(errStr)
       logger.error(errStr)
       return
+    } else {
+      this.e.reply(`正在获取页面：${opggUrl}`)
     }
-    const opggUrl = `https://www.op.gg/champions?region=global&tier=${tier}&position=${position}`
+    let browser = null
+    let page = null
     try {
       if (!await puppeteer.browserInit()) {
         return
       }
-      const browser = puppeteer.browser
-      const page = await browser.newPage()
+      browser = puppeteer.browser
+      page = await browser.newPage()
       page.setViewport({
         width: 1920,
         height: 1080,
@@ -74,16 +78,24 @@ export class opgg extends plugin {
         type: 'jpeg',
       })
       const imageMsg = segment.image(buff)
-      page.close().catch((err) => {
-        logger.error('页面关闭失败')
-        logger.error(err)
-      })
       this.e.reply(imageMsg)
     } catch (err) {
       this.e.reply(`${err.toString()}: ${opggUrl}`)
       logger.error('获取opgg数据数据失败')
       logger.error(err)
+      if (browser) {
+        await browser.close().catch(err => logger.error(err))
+      }
+    } finally {
+      if (page) {
+        await page.close().catch((err) => {
+          logger.error('页面关闭失败')
+          logger.error(err)
+        })
+      }
     }
+    page = null
+    browser = null
   }
 
   /**
