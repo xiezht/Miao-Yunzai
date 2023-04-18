@@ -72,8 +72,11 @@ export class opgg extends plugin {
         width: 1920,
         height: 1080,
       })
-      await page.goto(opggUrl, { timeout: 120000 })
-      const body = await page.$('#content-container')
+      await page.goto(opggUrl, {
+        timeout: 30000,
+        waitUntil: 'load'
+      })
+      const body = await page.$('#content-container main')
       const buff = await body.screenshot({
         type: 'jpeg',
       })
