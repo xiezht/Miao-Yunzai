@@ -13,8 +13,20 @@ import plugin from "../../lib/plugins/plugin.js"
 import ffmpeg from 'fluent-ffmpeg'
 import { mkdirSync, rmSync } from 'node:fs'
 
+
+// 这里好像每次消息来了都会实例化一次插件，似乎得把 queue/handling 放到顶层变量
+
+const cacheDir = './data/webm2mp4/webm'
+const resDir = './data/webm2mp4/mp4'
+/**
+ * @type {Array<{ fileUrl: string, fid: string, name: string, groupId: number, path: string, outputPath: string }>}
+ */
+const queue = []
+let inited = false
+let handling = false
+
 export class webm2mp4 extends plugin {
-  // TODO 这里好像每次消息来了都会实例化一次插件，是不是得把 queue/handling 放到顶层变量
+  // TODO 
   constructor() {
     logger.mark(`[webm2mp4] 正在实例化 webm2mp4 插件`)
     super({
@@ -24,15 +36,6 @@ export class webm2mp4 extends plugin {
       event: 'message',
       priority: 500,
     })
-    this.ffmpeg = ffmpeg
-    /**
-     * @type {Array<{ fileUrl: string, fid: string, name: string, groupId: number, path: string, outputPath: string }>}
-     */
-    this.queue = []
-    this.handling = false
-    this.cacheDir = './data/webm2mp4/webm'
-    this.resDir = './data/webm2mp4/mp4'
-    this.inited = false
     this.initCacheDir()
   }
   
@@ -41,88 +44,119 @@ export class webm2mp4 extends plugin {
       if (!this.e.isGroup || !this.e.file) return
       const { name, fid } = this.e.file
       if (!name.endsWith('.webm')) return
-      const fileUrl = await this.e.group.getFileUrl(fid)
-      const filePath = `${this.cacheDir}/${fid}.webm`
-      const outputPath = `${this.resDir}/${fid}.mp4`
-
-      this.e.reply(`文件 [${name}] 已加入处理队列`)
-      await common.downFile(fileUrl, filePath)
-      this.queue.push({
+      const filePath = `${cacheDir}/${fid}.webm`
+      const outputPath = `${resDir}/${fid}.mp4`
+      queue.push({
         groupId: this.e.group_id,
         fid,
-        fileUrl,
+        // fileUrl,
         name,
         path: filePath,
         outputPath,
       })
-      if (!this.handling) {
+      this.e.reply(`文件 [${name}] 已加入处理队列，队列长度 ${queue.length}`)
+      if (!handling) {
         this.startTranscode()
       }
     } catch (err) {
-      logger.error(`[webm2mp4] 处理失败 ${err.toString()}`)
+      logger.error(`[webm2mp4] ${err.toString()}`)
     }
   }
   async startTranscode() {
-    if (this.queue.length && !this.handling) {
-      logger.mark('[webm2mp4] 开始处理队列')
-      // // 缓存当前队列
-      // const tempQueue = [].concat(this.queue)
-      const top = this.queue.shift()
-      this.handling = true
-      await new Promise((resolve) => {
-        this.ffmpeg(top.path)
-          .inputOptions([
-            '-threads 4'
-          ])
-          .output(top.outputPath)
-          .on('progress', function(progress) {
-            logger.mark('[webm2mp4] Processing: ' + progress.percent + '% done');
-          })
-          .on('end', () => {
-            resolve({ status: 0, msg: 'Success' })
-          })
-          .on('error', (err) => {
-            logger.error(`[webm2mp4] 文件转码出错 ${top.name} fid：${top.fid}`)
-            resolve({ status: 1, msg: err.toString() })
-          })
-          .run()
-      })
-      // TODO 这里是不是可以等队列处理完了，统一回传到群消息
-      await this.e.group.fs.upload(
-        top.outputPath,
-        '/',
-        top.name.replace('.webm', '.mp4'),
-        (percent) => {
-          logger.mark(`[webm2mp4] mp4文件上传中：${percent} % done`)
+    if (queue.length && !handling) {
+      try {
+        logger.mark(`[webm2mp4] 开始处理队列，队列长度 ${queue.length}`)
+        const top = queue.shift()
+        logger.info(`栈顶元素 ${JSON.stringify(top)}`)
+        handling = true
+        // 下载文件
+        top.fileUrl = await this.e.group.getFileUrl(top.fid)
+        if (!await common.downFile(top.fileUrl, top.path)) {
+          this.e.reply(`服务器下载视频文件失败：${top.name}`)
+          throw new Error(`文件下载失败：${top.fileUrl}`)
         }
-      )
-      logger.info(`[webm2mp4] 转码结束：${top.name}`)
-      if (this.queue.length === 0) {
-        this.handling = false
-        logger.info('[webm2mp4] 转码队列处理完毕')
-        this.clearCacheDir()
-        return
-      } else {
-        process.nextTick(this.startTranscode.bind(this))
+        // 进行文件转码
+        const transJob = async () => {
+          return await new Promise((resolve, reject) => {
+            ffmpeg(top.path)
+              .inputOptions([
+                '-threads 4'
+              ])
+              .output(top.outputPath)
+              .on('end', () => {
+                logger.info(`[webm2mp4] 转码结束：${top.name}`)
+                resolve({ status: 0, msg: 'Success' })
+              })
+              .on('error', (err) => {
+                this.e.reply(`文件 [${top.name}] 转码出错 `)
+                reject(err)
+              })
+              .run()
+          })
+        }
+        await this.startJobAndLogTime(transJob, `视频转码：${top.name}`)
+        
+        // 转码成功，则进行文件上传，否则群消息提示
+        const uploadJob = async () => {
+          return await this.e.group.fs.upload(
+            top.outputPath,
+            '/',
+            top.name.replace('.webm', '.mp4')
+          )
+        }
+        await this.startJobAndLogTime(uploadJob, `文件上传：${top.name.replace('.webm', '.mp4')}`)
+      } catch (err) {
+        logger.error(`[webm2mp4] 文件转码失败 ${err.toString()}`)
+      } finally {
+        handling = false
+        if (queue.length === 0) {
+          logger.info('[webm2mp4] 转码队列处理完毕')
+          this.clearCacheDir()
+          return
+        } else {
+          process.nextTick(this.startTranscode.bind(this))
+        }
       }
     }
   }
 
   initCacheDir() {
-    if (this.inited) return
+    if (inited) return
     logger.mark('[webm2mp4] 初始化webm2mp4目录')
-    mkdirSync(this.cacheDir, { recursive: true })
-    mkdirSync(this.resDir, { recursive: true })
-    this.inited = true
+    mkdirSync(cacheDir, { recursive: true })
+    mkdirSync(resDir, { recursive: true })
+    inited = true
   }
 
   // 队列处理完成后，统一清理一次缓存目录，避免溢出
   clearCacheDir() {
     logger.mark('[webm2mp4] 清理缓存并重新创建目录')
-    rmSync(this.cacheDir, { recursive: true })
-    rmSync(this.resDir, { recursive: true })
+    rmSync(cacheDir, { recursive: true })
+    rmSync(resDir, { recursive: true })
     // 重新创建目录
-    mkdirSync(this.cacheDir, { recursive: true })
-    mkdirSync(this.resDir, { recursive: true })
+    mkdirSync(cacheDir, { recursive: true })
+    mkdirSync(resDir, { recursive: true })
+  }
+
+  /**
+   * 
+   * @param {Promise | Function} func 注意自行绑定this
+   * @param {string} name 
+   * @returns 返回 func 函数本身执行的结果
+   */
+  startJobAndLogTime(func, name = 'Job') {
+    const start = performance.now()
+    if (func.then) {
+      return func().then((res) => {
+        const end = performance.now()
+        logger.mark(`[webm2mp4] ${name}执行时长 ${end - start}ms`)
+        return res
+      })
+    } else {
+      const res = func()
+      const end = performance.now()
+      logger.mark(`[webm2mp4] 任务：${name} 执行时长：${end - start}s`)
+      return res
+    }
   }
 }
