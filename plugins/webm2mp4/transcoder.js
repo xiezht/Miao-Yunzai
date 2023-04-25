@@ -14,6 +14,7 @@ import ffmpeg from 'fluent-ffmpeg'
 import { mkdirSync, rmSync } from 'node:fs'
 
 export class webm2mp4 extends plugin {
+  // TODO 这里好像每次消息来了都会实例化一次插件，是不是得把 queue/handling 放到顶层变量
   constructor() {
     logger.mark(`[webm2mp4] 正在实例化 webm2mp4 插件`)
     super({
