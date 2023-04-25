@@ -94,17 +94,26 @@ export class webm2mp4 extends plugin {
               .run()
           })
         }
-        await this.startJobAndLogTime(transJob, `视频转码：${top.name}`)
+        await this.startJobAndLogTime(transJob, `视频转码[${top.name}]`)
         
         // 转码成功，则进行文件上传，否则群消息提示
+        // NOTE：这里的upload 需要使用 callback 参数计算进度，没法使用 startJobAndLogTime 函数
         const uploadJob = async () => {
+          const start = performance.now()
+          const newName = top.name.replace('.webm', '.mp4')
           return await this.e.group.fs.upload(
             top.outputPath,
             '/',
-            top.name.replace('.webm', '.mp4')
+            newName,
+            (perc) => {
+              if (perc > 99.9) {
+                const end = performance.now()
+                logger.mark(`[webm2mp4] 任务：文件上传[${newName}] 执行时长：${end - start}s`)
+              }
+            }
           )
         }
-        await this.startJobAndLogTime(uploadJob, `文件上传：${top.name.replace('.webm', '.mp4')}`)
+        await uploadJob()
       } catch (err) {
         logger.error(`[webm2mp4] 文件转码失败 ${err.toString()}`)
       } finally {
@@ -142,7 +151,7 @@ export class webm2mp4 extends plugin {
    * 
    * @param {Promise | Function} func 注意自行绑定this
    * @param {string} name 
-   * @returns 返回 func 函数本身执行的结果
+   * @returns 返回 func 函数本身执行的结果，是否返回 Promise 取决于 func
    */
   startJobAndLogTime(func, name = 'Job') {
     const start = performance.now()
