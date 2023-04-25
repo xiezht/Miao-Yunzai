@@ -76,8 +76,8 @@ export class webm2mp4 extends plugin {
           throw new Error(`文件下载失败：${top.fileUrl}`)
         }
         // 进行文件转码
-        const transJob = async () => {
-          return await new Promise((resolve, reject) => {
+        const transJob = () => {
+          return new Promise((resolve, reject) => {
             ffmpeg(top.path)
               .inputOptions([
                 '-threads 4'
@@ -108,7 +108,7 @@ export class webm2mp4 extends plugin {
             (perc) => {
               if (perc > 99.9) {
                 const end = performance.now()
-                logger.mark(`[webm2mp4] 任务：文件上传[${newName}] 执行时长：${end - start}s`)
+                logger.mark(`[webm2mp4] 任务：文件上传[${newName}] 执行时长：${end - start}ms`)
               }
             }
           )
@@ -149,23 +149,24 @@ export class webm2mp4 extends plugin {
 
   /**
    * 
-   * @param {Promise | Function} func 注意自行绑定this
+   * @param {Function} func 注意自行绑定this
    * @param {string} name 
    * @returns 返回 func 函数本身执行的结果，是否返回 Promise 取决于 func
    */
   startJobAndLogTime(func, name = 'Job') {
     const start = performance.now()
-    if (func.then) {
-      return func().then((res) => {
+    const funcRes = func()
+    // 如果函数返回了一个 promise，那么把计算时长的逻辑放到 then 里面
+    if (funcRes.then) {
+      return funcRes.then((res) => {
         const end = performance.now()
-        logger.mark(`[webm2mp4] ${name}执行时长 ${end - start}ms`)
+        logger.mark(`[webm2mp4] 任务：${name} 执行时长：${end - start}ms`)
         return res
       })
     } else {
-      const res = func()
       const end = performance.now()
-      logger.mark(`[webm2mp4] 任务：${name} 执行时长：${end - start}s`)
-      return res
+      logger.mark(`[webm2mp4] 任务：${name} 执行时长：${end - start}ms`)
+      return funcRes
     }
   }
 }
