@@ -2,7 +2,6 @@ import plugin from "../../lib/plugins/plugin.js"
 import { segment } from "oicq"
 import puppeteer from "../../lib/puppeteer/puppeteer.js"
 
-
 const tierMaps = {
   challenger: '王者',
   grandmaster: '傲视宗师',
@@ -41,6 +40,10 @@ export class opgg extends plugin {
           reg: /^#?[LOL|lol](.*)$/,
           /** 执行方法 */
           fnc: 'handleOpgg'
+        },
+        {
+          reg: /^#?[LOL|lol](.*)[counter](.*)$/,
+          fnc: 'handleCounter'
         }
       ]
     })
@@ -96,7 +99,12 @@ export class opgg extends plugin {
       }
     }
   }
+  /**
+   * 处理 counter 指令
+   */
+  handleCounter() {
 
+  }
   /**
    * 解析段位/位置
    */
@@ -115,6 +123,14 @@ export class opgg extends plugin {
       tier,
       position
     }
+  }
+  resolveCounterCmd(msg) {
+    // TODO 需要解析英雄名称，counter对象
+    // return {
+    //   tier,
+    //   champion,
+    //   targetChampion,
+    // }
   }
   findKeyFromValue(value, maps) {
     for (let entry of Object.entries(maps)) {

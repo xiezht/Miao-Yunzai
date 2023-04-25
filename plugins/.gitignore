@@ -28,3 +28,5 @@ example/**
 # 我的插件
 !opgg
 !opgg/**
+!webm2mp4
+!webm2mp4/**
