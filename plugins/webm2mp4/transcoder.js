@@ -77,7 +77,14 @@ export class webm2mp4 extends plugin {
         const transJob = () => {
           return new Promise((resolve, reject) => {
             ffmpeg(top.path)
+              .inputOptions([
+                '-threads 1',
+              ])
               .output(top.outputPath)
+              .outputOptions([
+                '-r 30',
+                '-crf 30',
+              ])
               .on('end', () => {
                 logger.info(`[webm2mp4] 转码结束：${top.name}`)
                 resolve({ status: 0, msg: 'Success' })
