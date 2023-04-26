@@ -34,7 +34,7 @@ export class update extends plugin {
       ]
     })
 
-    this.typeName = 'Yunzai-Bot'
+    this.typeName = 'Miao-Yunzai'
   }
 
   async update () {
@@ -256,19 +256,19 @@ export class update extends plugin {
 
     let end = ''
 
-    log = await this.makeForwardMsg(`${plugin || 'Yunzai-Bot'}更新日志，共${line}条`, log, end)
+    log = await this.makeForwardMsg(`${plugin || 'Miao-Yunzai'}更新日志，共${line}条`, log, end)
 
     return log
   }
 
   async makeForwardMsg (title, msg, end) {
-    let nickname = Bot.nickname
+    let nickname = this.e.bot.nickname
     if (this.e.isGroup) {
-      let info = await Bot.getGroupMemberInfo(this.e.group_id, Bot.uin)
+      let info = await this.e.bot.getGroupMemberInfo(this.e.group_id, this.e.bot.uin)
       nickname = info.card ?? info.nickname
     }
     let userInfo = {
-      user_id: Bot.uin,
+      user_id: this.e.bot.uin,
       nickname
     }
 
