@@ -55,10 +55,10 @@ export class webm2mp4 extends plugin {
       })
       this.e.reply(`文件 [${name}] 已加入处理队列，队列长度 ${queue.length}`)
       if (!handling) {
-        this.startTranscode()
+        await this.startTranscode()
       }
     } catch (err) {
-      logger.error(`[webm2mp4] ${err.toString()}`)
+      logger.error(`[webm2mp4] ${err}`)
     }
   }
   async startTranscode() {
@@ -71,8 +71,7 @@ export class webm2mp4 extends plugin {
         // 下载文件
         top.fileUrl = await this.e.group.getFileUrl(top.fid)
         if (!await common.downFile(top.fileUrl, top.path)) {
-          this.e.reply(`服务器下载视频文件失败：${top.name}`)
-          throw new Error(`文件下载失败：${top.fileUrl}`)
+          throw new Error(`文件[${top.name}]下载失败：${top.fileUrl}`)
         }
         // 进行文件转码
         const transJob = () => {
@@ -110,16 +109,19 @@ export class webm2mp4 extends plugin {
         }
         await uploadJob()
       } catch (err) {
-        this.e.reply(`处理失败，原因： ${err}`)
-        logger.error(`[webm2mp4] 处理失败，原因： ${err}`)
+        this.e.reply(`处理失败，原因： ${err.message}`)
+        logger.error(`[webm2mp4] 处理失败，原因： ${err.message}`)
       } finally {
+        logger.info('[webm2mp4] 单次处理结束，判定是否继续处理')
         handling = false
         if (queue.length === 0) {
           logger.info('[webm2mp4] 转码队列处理完毕')
           this.clearCacheDir()
           return
         } else {
-          this.startTranscode()
+          setTimeout(async() => {
+            await this.startTranscode()
+          }, 0)
         }
       }
     }
