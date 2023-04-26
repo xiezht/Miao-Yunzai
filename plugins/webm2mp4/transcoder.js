@@ -19,6 +19,7 @@ import { mkdirSync, rmSync } from 'node:fs'
 const cacheDir = './data/webm2mp4/webm'
 const resDir = './data/webm2mp4/mp4'
 /**
+ * 这个队列似乎可以放到 redis 中
  * @type {Array<{ fileUrl: string, fid: string, name: string, groupId: number, path: string, outputPath: string }>}
  */
 const queue = []
@@ -26,9 +27,7 @@ let inited = false
 let handling = false
 
 export class webm2mp4 extends plugin {
-  // TODO 
   constructor() {
-    logger.mark(`[webm2mp4] 正在实例化 webm2mp4 插件`)
     super({
       name: 'webm2mp4',
       dsc: '',
@@ -67,7 +66,7 @@ export class webm2mp4 extends plugin {
       try {
         logger.mark(`[webm2mp4] 开始处理队列，队列长度 ${queue.length}`)
         const top = queue.shift()
-        logger.info(`栈顶元素 ${JSON.stringify(top)}`)
+        logger.mark(`栈顶元素 ${JSON.stringify(top)}`)
         handling = true
         // 下载文件
         top.fileUrl = await this.e.group.getFileUrl(top.fid)
@@ -79,17 +78,13 @@ export class webm2mp4 extends plugin {
         const transJob = () => {
           return new Promise((resolve, reject) => {
             ffmpeg(top.path)
-              .inputOptions([
-                '-threads 4'
-              ])
               .output(top.outputPath)
               .on('end', () => {
                 logger.info(`[webm2mp4] 转码结束：${top.name}`)
                 resolve({ status: 0, msg: 'Success' })
               })
               .on('error', (err) => {
-                this.e.reply(`文件 [${top.name}] 转码出错 `)
-                reject(err)
+                reject(`ffmpeg转码失败 [${err}]`)
               })
               .run()
           })
@@ -115,7 +110,8 @@ export class webm2mp4 extends plugin {
         }
         await uploadJob()
       } catch (err) {
-        logger.error(`[webm2mp4] 文件转码失败 ${err.toString()}`)
+        this.e.reply(`处理失败，原因： ${err}`)
+        logger.error(`[webm2mp4] 处理失败，原因： ${err}`)
       } finally {
         handling = false
         if (queue.length === 0) {
@@ -123,7 +119,7 @@ export class webm2mp4 extends plugin {
           this.clearCacheDir()
           return
         } else {
-          process.nextTick(this.startTranscode.bind(this))
+          this.startTranscode()
         }
       }
     }

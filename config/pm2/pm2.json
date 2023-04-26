@@ -3,7 +3,7 @@
     {
       "name": "Miao-Yunzai",
       "script": "./app.js",
-      "max_memory_restart": "512M",
+      "max_memory_restart": "1000M",
       "restart_delay": 60000
     }
   ]
