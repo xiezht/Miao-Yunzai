@@ -109,14 +109,15 @@ export class webm2mp4 extends plugin {
         }
         await uploadJob()
       } catch (err) {
-        this.e.reply(`处理失败，原因： ${err.message}`)
-        logger.error(`[webm2mp4] 处理失败，原因： ${err.message}`)
+        this.e.reply(`处理失败，原因： ${err.message || JSON.stringify(err)}`)
+        logger.error('[webm2mp4] 处理失败')
+        logger.error(err)
       } finally {
         logger.info('[webm2mp4] 单次处理结束，判定是否继续处理')
         handling = false
         if (queue.length === 0) {
           logger.info('[webm2mp4] 转码队列处理完毕')
-          this.clearCacheDir()
+        //   this.clearCacheDir()
           return
         } else {
           setTimeout(async() => {
