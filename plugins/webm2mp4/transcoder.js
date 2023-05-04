@@ -63,11 +63,9 @@ export class webm2mp4 extends plugin {
   }
   async startTranscode() {
     if (queue.length && !handling) {
-      let top = null
-      let errorFlag = false
       try {
         logger.mark(`[webm2mp4] 开始处理队列，队列长度 ${queue.length}`)
-        top = queue.shift()
+        const top = queue.shift()
         logger.mark(`栈顶元素 ${JSON.stringify(top)}`)
         handling = true
         // 下载文件
@@ -118,8 +116,8 @@ export class webm2mp4 extends plugin {
         }
         await uploadJob()
         await this.e.group.fs.rm(top.fid)
+        this.e.reply(`源文件[${top.name}]将进行清理`)
       } catch (err) {
-        errorFlag = true
         this.e.reply(`处理失败，原因： ${err.message || JSON.stringify(err)}`)
         logger.error('[webm2mp4] 处理失败')
         logger.error(err)
