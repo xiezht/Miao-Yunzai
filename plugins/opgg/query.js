@@ -37,12 +37,12 @@ export class opgg extends plugin {
       rule: [
         {
           /** 命令正则匹配 */
-          reg: /^#?[LOL|lol](.*)$/,
+          reg: /^#(?:LOL|lol)(.*)$/,
           /** 执行方法 */
           fnc: 'handleOpgg'
         },
         {
-          reg: /^#?[LOL|lol](.*)[counter](.*)$/,
+          reg: /^#(?:LOL|lol)(.*)[counter](.*)$/,
           fnc: 'handleCounter'
         }
       ]
@@ -111,7 +111,7 @@ export class opgg extends plugin {
   resolveCmd(msg) {
     const tierRegStr = '(' + Object.values(tierMaps).join('|') + ')'
     const posRegStr = '(' + Object.values(posMap).join('|') + ')'
-    const regx = new RegExp(`#?[LOL|lol]${tierRegStr}${posRegStr}`)
+    const regx = new RegExp(`#(?:LOL|lol)${tierRegStr}${posRegStr}`)
     const matchRes = regx.exec(msg)
     if (!matchRes) {
       return {}
