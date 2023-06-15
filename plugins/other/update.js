@@ -27,7 +27,7 @@ export class update extends plugin {
           fnc: 'update'
         },
         {
-          reg: '^#全部更新$',
+          reg: '^#全部(强制)?更新$',
           fnc: 'updateAll',
           permission: 'master'
         }
@@ -104,12 +104,17 @@ export class update extends plugin {
     let type = '更新'
     if (this.e.msg.includes('强制')) {
       type = '强制更新'
-      cm = `git reset --hard origin/master && ${cm}`
+      cm = `git fetch --all && git reset --hard && ${cm}`
     }
 
     if (plugin) {
-      cm = `git -C ./plugins/${plugin}/ pull --no-rebase`
-    }
+      if (this.e.msg.includes('强制')) {
+        type = '强制更新'
+        cm = `git -C ./plugins/${plugin}/ fetch --all && git -C ./plugins/${plugin}/ reset --hard && git -C ./plugins/${plugin}/ pull`
+      }else{
+        cm =  `git -C ./plugins/${plugin}/ pull --no-rebase`
+      }
+}
 
     this.oldCommitId = await this.getcommitId(plugin)
 

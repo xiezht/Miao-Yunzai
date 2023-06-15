@@ -32,7 +32,7 @@ export class gcLog extends plugin {
           fnc: 'logJson'
         },
         {
-          reg: '^#*(抽卡|抽奖|角色|武器|常驻|up)池*(记录|祈愿|分析)$',
+          reg: '^#*(原神|星铁)?(抽卡|抽奖|角色|武器|常驻|up|新手|光锥)池*(记录|祈愿|分析)$',
           fnc: 'getLog'
         },
         {
@@ -48,19 +48,22 @@ export class gcLog extends plugin {
           fnc: 'helpPort'
         },
         {
-          reg: '^#*(抽卡|抽奖|角色|武器|常驻|up)池*统计$',
+          reg: '^#*(原神|星铁)?(抽卡|抽奖|角色|武器|常驻|up|新手|光锥)池*统计$',
           fnc: 'logCount'
         }
       ]
     })
 
     this.androidUrl = 'docs.qq.com/doc/DUWpYaXlvSklmVXlX'
+    this._path = process.cwd().replace(/\\/g, '/')
   }
 
   async init () {
-    let file = './data/gachaJson'
-    if (!fs.existsSync(file)) {
-      fs.mkdirSync(file)
+    let file = ['./data/gachaJson','./data/srJson','./temp/html/StarRail']
+    for(let i of file){
+      if (!fs.existsSync(i)) {
+        fs.mkdirSync(i)
+      }
     }
   }
 
@@ -95,8 +98,8 @@ export class gcLog extends plugin {
 
     let data = await new GachaLog(this.e).logUrl()
     if (!data) return
-
-    let img = await puppeteer.screenshot('gachaLog', data)
+    let url = this.srHead('gachaLog', data)
+    let img = await puppeteer.screenshot(url, data)
     if (img) await this.reply(img)
   }
 
@@ -118,8 +121,13 @@ export class gcLog extends plugin {
     if (!data) return false
 
     if (typeof data != 'object') return
-
-    let img = await puppeteer.screenshot('gachaLog', data)
+    let url='gachaLog'
+    if(this.e.isSr){
+      url ='StarRail/gachaLog'
+      data.tplFile = './plugins/genshin/resources/StarRail/html/gachaLog/gachaLog.html'
+      data.headStyle =  `<style> .head_box { background: url(${this._path}/plugins/genshin/resources/StarRail/img/worldcard/星穹列车.png) #fff;  background-repeat: no-repeat; background-position-x: -10px; background-size: 500px; background-position-y: -90px; }</style>`
+    }
+    let img = await puppeteer.screenshot(url, data)
     if (img) await this.reply(img)
   }
 
@@ -127,8 +135,8 @@ export class gcLog extends plugin {
   async getLog () {
     let data = await new GachaLog(this.e).getLogData()
     if (!data) return
-
-    let img = await puppeteer.screenshot('gachaLog', data)
+    let url = this.srHead('gachaLog', data)
+    let img = await puppeteer.screenshot(url, data)
     if (img) await this.reply(img)
   }
 
@@ -139,7 +147,7 @@ export class gcLog extends plugin {
       return
     }
 
-    let friend = this.e.bot.fl.get(Number(this.e.user_id))
+    let friend = Bot.fl.get(Number(this.e.user_id))
     if (!friend) {
       await this.reply('无法发送文件，请先添加好友')
       return
@@ -197,12 +205,20 @@ export class gcLog extends plugin {
       await this.e.reply(segment.image(`file:///${_path}/resources/logHelp/记录帮助-苹果.png`))
     }
   }
-
+  srHead = (url, data) => {
+    let name = url
+    if (this.e.isSr) {
+      name = `StarRail/${url}`
+      data.tplFile = `./plugins/genshin/resources/StarRail/html/${url}/${url}.html`
+      data.headStyle = `<style> .head_box { background: url(${this._path}/plugins/genshin/resources/StarRail/img/worldcard/星穹列车.png) #fff; background-position-x: -10px; background-repeat: no-repeat; background-size: 540px; background-position-y: -100px; </style>`
+    }
+    return name
+  }
   async logCount () {
     let data = await new LogCount(this.e).count()
     if (!data) return
-
-    let img = await puppeteer.screenshot('logCount', data)
+    let url = this.srHead('logCount', data)
+    let img = await puppeteer.screenshot(url, data)
     if (img) await this.reply(img)
   }
 }

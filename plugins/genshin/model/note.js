@@ -16,15 +16,104 @@ export default class Note extends base {
   }
 
   async getData () {
-    let res = await MysInfo.get(this.e, 'dailyNote')
-
+    let seed_id = lodash.sample('abcdefghijklmnopqrstuvwxyz0123456789', 16).replace(/,/g, '')
+    let device_fp = await MysInfo.get(this.e, 'getFp', {
+      seed_id
+    })
+    let res = await MysInfo.get(this.e, 'dailyNote', {
+      headers: {
+        'x-rpc-device_fp': device_fp?.data?.device_fp
+      }
+    })
+    let resUser
     if (!res || res.retcode !== 0) return false
+
     /** 截图数据 */
+    let data = this.e.isSr ? this.noteSr(res) : this.noteData(res)
+
+    let screenData = this.screenData
+    if (this.e.isSr) {
+      screenData.tplFile = './plugins/genshin/resources/StarRail/html/dailyNote/dailyNote.html'
+      resUser = await MysInfo.get(this.e, 'UserGame')
+      resUser.data?.list?.forEach(v => this.e.uid.includes(v.game_biz))
+      if (!resUser || resUser.retcode !== 0) return false
+    }
     return {
       name: this.e.sender.card,
       quality: 80,
-      ...this.screenData,
-      ...this.noteData(res)
+      ...screenData,
+      ...data, ...resUser?.data?.list[0]
+    }
+  }
+
+  noteSr (res) {
+    let { data } = res
+    let nowDay = moment().date()
+    let nowUnix = Number(moment().format('X'))
+    /** 树脂 */
+    let resinMaxTime
+    if (data.stamina_recover_time > 0) {
+      let d = moment.duration(data.stamina_recover_time, 'seconds')
+      let day = Math.floor(d.asDays())
+      let hours = d.hours()
+      let minutes = d.minutes()
+      let seconds = d.seconds()
+      resinMaxTime = hours + '小时' + minutes + '分钟' + seconds + '秒'
+      //精确到秒。。。。
+      if (day > 0) {
+        resinMaxTime = day + '天' + hours + '小时' + minutes + '分钟' + seconds + '秒'
+      } else if (hours > 0) {
+        resinMaxTime = hours + '小时' + minutes + '分钟' + seconds + '秒'
+      } else if (minutes > 0) {
+        resinMaxTime = minutes + '分钟' + seconds + '秒'
+      } else if (seconds > 0) {
+        resinMaxTime = seconds + '秒'
+      }
+      if ((day > 0) || (hours > 0) || (seconds > 0)) {
+      let total_seconds = 3600*hours + 60*minutes + seconds
+      const now = new Date()
+      const dateTimes = now.getTime() + total_seconds * 1000
+      const date = new Date(dateTimes)
+      const dayDiff = date.getDate() - now.getDate()
+      const str = dayDiff === 0 ? '今日' : '明日'
+      const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date
+              .getMinutes()
+              .toString()
+              .padStart(2, '0')}`
+      let recoverTimeStr = ` | [${str}]${timeStr}`
+        resinMaxTime += recoverTimeStr
+      }
+    }
+    data.bfStamina = data.current_stamina / data.max_stamina * 100 + '%'
+    /** 派遣 */
+    for (let item of data.expeditions) {
+      let d = moment.duration(item.remaining_time, 'seconds')
+      let day = Math.floor(d.asDays())
+      let hours = d.hours()
+      let minutes = d.minutes()
+      item.dateTime = ([day + '天', hours + '时', minutes + '分'].filter(v => !['0天', '0时', '0分'].includes(v))).join('')
+      item.bfTime = (72000 - item.remaining_time) / 72000 * 100 + '%'
+      if (item.avatars.length == 1) {
+        item.avatars.push('派遣头像')
+      }
+    }
+    // 标识属性图标~
+    let icon = lodash.sample(['希儿', '白露', '艾丝妲', '布洛妮娅', '姬子', '卡芙卡', '克拉拉', '停云', '佩拉', '黑塔', '希露瓦', '银狼'])
+    let week = [
+      '星期日',
+      '星期一',
+      '星期二',
+      '星期三',
+      '星期四',
+      '星期五',
+      '星期六'
+    ]
+    let day = `${week[moment().day()]}`
+    return {
+      uid: this.e.uid,
+      saveId: this.e.uid, icon, day,
+      resinMaxTime, nowDay: moment(new Date()).format('YYYY年MM月DD日'),
+      ...data
     }
   }
 
@@ -77,7 +166,9 @@ export default class Note extends base {
       if (coinDay > 0) {
         coinTime = `${coinDay}天${coinHour}小时${coinMin}分钟`
       } else {
-        let coinDate = moment.unix(nowUnix + Number(data.home_coin_recovery_time))
+        let coinDate = moment.unix(
+          nowUnix + Number(data.home_coin_recovery_time)
+        )
 
         if (coinDate.date() != nowDay) {
           coinTime = `明天 ${coinDate.format('HH:mm')}`
@@ -87,7 +178,15 @@ export default class Note extends base {
       }
     }
 
-    let week = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+    let week = [
+      '星期日',
+      '星期一',
+      '星期二',
+      '星期三',
+      '星期四',
+      '星期五',
+      '星期六'
+    ]
     let day = `${moment().format('MM-DD HH:mm')} ${week[moment().day()]}`
 
     /** 参量质变仪 */
